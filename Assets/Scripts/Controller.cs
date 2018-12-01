@@ -11,7 +11,9 @@ public class Controller : MonoBehaviour
     [Header("Prefebs")]
     public GameObject RoomPrefeb;
     public GameObject RouterPrefeb;
-    public GameObject DetectPrefeb;
+    public GameObject RouterPreviewerPrefeb;
+    public GameObject CheckPointPreviewerPrefeb;
+
     public GameObject heatPrefeb;
 
     public GameObject CheckPointPrefeb;
@@ -37,6 +39,7 @@ public class Controller : MonoBehaviour
 
 
     public GameObject Menu;
+    public GameObject Mask;
     public Sprite HideHeat;
     public Sprite ShowHeat;
     public Sprite HideList;
@@ -59,15 +62,17 @@ public class Controller : MonoBehaviour
     public GameObject originObject;
     public Transform parentTransForm;
 
-    bool canPlace = false; //处于放置状态
-    bool canMove = false;
+    bool isSearchingRoom = false;
+    bool isPlacingRouter = false; //处于放置状态
+    bool isPlacingCheckPoint = false;
     bool UItouched = false;
-    bool planePlaced = false;   //是否已放置房间
+    bool RoomSetted = false;   //是否已放置房间
     bool isDeleting = false;
     bool isRenaming = false;
     bool heatAllHiden = false;
     float roomTransparency = 0.0f;    //房间透明度
-    GameObject detectPlane;    //预览router对象
+    GameObject RouterPreviewer;    //预览router对象
+    GameObject CheckPointPreviewer;
     GameObject chosenRouter;    //选定router对象
     GameObject chosenCheckpoint;    //选定checkpoint对象
     GameObject roomcube;    //房间对象
@@ -93,8 +98,10 @@ public class Controller : MonoBehaviour
     }
     void Update()
     {
-        if (planePlaced && !canPlace && detectPlane != null)//房间已经放置，但是不处于放置状态，但是却有预览
-            detectPlane.SetActive(false);
+        if (RoomSetted && !isPlacingRouter && RouterPreviewer != null)//房间已经放置，但是不处于放置状态，但是却有预览
+            RouterPreviewer.SetActive(false);
+        if (RoomSetted && !isPlacingCheckPoint && CheckPointPreviewer != null)
+            CheckPointPreviewer.SetActive(false);
 
         if (CheckPoints.Count != 0)
         {
@@ -122,10 +129,14 @@ public class Controller : MonoBehaviour
             }
         }
 
-        if (planePlaced)
+        if (RoomSetted)
+        {
             RouterPreview();
-
-        MobilePick();
+            CheckPointPreview();
+            MobilePick();
+        }
+        if (isSearchingRoom)
+            Searching();
     }
     void RouterPreview()    //预览router放置位置
     {
@@ -135,48 +146,85 @@ public class Controller : MonoBehaviour
             foreach (GameObject obj in objs)    //遍历所有gameobject
             {
                 obj.gameObject.SetActive(false);
-                //Destroy(obj.gameObject);  
             }
         }
         RaycastHit hit;
         Ray ray = Camera.main.ScreenPointToRay(new Vector3(Screen.width / 2, Screen.height / 2, 0));
 
-        if (canPlace && Physics.Raycast(ray, out hit, maxRayDistance, 1 << 12))
+        if (isPlacingRouter && Physics.Raycast(ray, out hit, maxRayDistance, 1 << 12))
         {
-            if (detectPlane == null)
+            if (RouterPreviewer == null)
             {
-                detectPlane = Instantiate(DetectPrefeb, hit.point, hit.transform.rotation) as GameObject;
+                RouterPreviewer = Instantiate(RouterPreviewerPrefeb, hit.point, hit.transform.rotation) as GameObject;
             }
             else
             {
-                detectPlane.transform.position = hit.point;
-                detectPlane.transform.rotation = hit.transform.rotation;
+                RouterPreviewer.transform.position = hit.point;
+                RouterPreviewer.transform.rotation = hit.transform.rotation;
             }
             switch (hit.transform.gameObject.tag)
             {
                 case "ground":
-                    detectPlane.transform.Rotate(new Vector3(0, 0, 0));
+                    RouterPreviewer.transform.Rotate(new Vector3(0, 0, 0));
                     break;
                 case "back":
-                    detectPlane.transform.Rotate(new Vector3(-90, 0, -180));
+                    RouterPreviewer.transform.Rotate(new Vector3(-90, 0, -180));
                     break;
                 case "forward":
-                    detectPlane.transform.Rotate(new Vector3(-90, -180, -180));
+                    RouterPreviewer.transform.Rotate(new Vector3(-90, -180, -180));
                     break;
                 case "left":
-                    detectPlane.transform.Rotate(new Vector3(-90, -90, 0));
+                    RouterPreviewer.transform.Rotate(new Vector3(-90, -90, 0));
                     break;
                 case "right":
-                    detectPlane.transform.Rotate(new Vector3(-90, 90, 0));
+                    RouterPreviewer.transform.Rotate(new Vector3(-90, 90, 0));
                     break;
                 case "celling":
-                    detectPlane.transform.Rotate(new Vector3(-180, 0, 0));
+                    RouterPreviewer.transform.Rotate(new Vector3(-180, 0, 0));
                     break;
 
 
             }
 
         }
+    }
+    void CheckPointPreview()    //预览router放置位置
+    {
+        RaycastHit hit;
+        Ray ray = Camera.main.ScreenPointToRay(new Vector3(Screen.width / 2, Screen.height / 2, 0));
+
+        if (isPlacingCheckPoint && Physics.Raycast(ray, out hit, maxRayDistance, 1 << 12) && hit.transform.gameObject.tag == "ground")
+        {
+            if (CheckPointPreviewer == null)
+            {
+                CheckPointPreviewer = Instantiate(CheckPointPreviewerPrefeb, hit.point, hit.transform.rotation) as GameObject;
+            }
+            else
+            {
+                CheckPointPreviewer.transform.position = hit.point;
+            }
+
+        }
+    }
+
+    void Searching()
+    {
+
+        RaycastHit hit;
+        Ray ray = Camera.main.ScreenPointToRay(new Vector3(Screen.width / 2, Screen.height / 2, 0));
+        if (!RoomSetted && Physics.Raycast(ray, out hit, maxRayDistance, 1 << 10))
+        {
+            hit.transform.gameObject.tag = "selected";
+            roomcube = Instantiate(RoomPrefeb, hit.transform.position, Quaternion.Euler(new Vector3(0, hit.transform.rotation.eulerAngles.y, 0))) as GameObject;
+            roomcube.transform.localPosition = new Vector3(roomcube.transform.localPosition.x + 0.10f, roomcube.transform.localPosition.y, roomcube.transform.localPosition.z + 0.15f);
+            GenerateImageAnchor.SetActive(false);
+            RoomSetted = true;
+            hideButton.SetActive(true);
+            isSearchingRoom = false;
+            restartButton.SetActive(true);
+            Mask.SetActive(false);
+        }
+
     }
     void MobilePick()    //触屏点击
     {
@@ -188,195 +236,211 @@ public class Controller : MonoBehaviour
             {
                 RaycastHit hit;
                 Ray ray = Camera.main.ScreenPointToRay(Input.GetTouch(0).position);
-
-                if (!planePlaced && Physics.Raycast(ray, out hit, maxRayDistance, 1 << 10))//未放置房间，鼠标点击
+                if (isPlacingRouter)//放置
                 {
-                    hit.transform.gameObject.tag = "selected";
-                    roomcube = Instantiate(RoomPrefeb, hit.transform.position, Quaternion.Euler(new Vector3(0, hit.transform.rotation.eulerAngles.y, 0))) as GameObject;
-                    roomcube.transform.localPosition = new Vector3(roomcube.transform.localPosition.x + 0.10f, roomcube.transform.localPosition.y, roomcube.transform.localPosition.z + 0.15f);
-                    GenerateImageAnchor.SetActive(false);
-                    planePlaced = true;
-                    hideButton.SetActive(true);
+                    Routers.Add(Instantiate(RouterPrefeb, RouterPreviewer.transform.position, RouterPreviewer.transform.rotation) as GameObject);
+                    isPlacingRouter = false;
+                    foreach (Transform r in Routers[Routers.Count - 1].GetComponentsInChildren<Transform>())
+                    {
+                        if (r.gameObject.name == "GameObject")
+                            r.gameObject.name = routerId.ToString();
+                    }
+                    RouterInfo tempRouterInfo = new RouterInfo(routerId.ToString(), routerId.ToString() + "号设备");
+                    routerInfos.Add(tempRouterInfo);
+                    Debug.Log(tempRouterInfo._name);
+                    Heats.Add(
+                        Instantiate(
+                            heatPrefeb,
+                            new Vector3(RouterPreviewer.transform.position.x, roomcube.transform.position.y, RouterPreviewer.transform.position.z),
+                            heatPrefeb.transform.rotation)
+                            );
+                    Heats[Heats.Count - 1].name = routerId.ToString();
+                    routerId++;
+                    RouterPreviewer.SetActive(false);
+                    addRouterButton.SetActive(true);
+                    checkButton.SetActive(true);
+                    restartButton.SetActive(true);
+                    hideHeatButton.SetActive(true);
+                    hideListButton.SetActive(true);
                 }
-                else if (planePlaced)//已放置房间
+                else if (isPlacingCheckPoint)
                 {
-                    if (chosenRouter == null && chosenCheckpoint == null)//未选定
-                    {
-                        if (!canPlace)//不处于放置状态
-                        {
-                            if (Physics.Raycast(ray, out hit, maxRayDistance, 1 << 11))//点击到11.模型，则选定
-                            {
-                                chosenRouter = hit.transform.gameObject;
-                                chosenCheckpoint = null;
-                                Debug.Log(chosenRouter.name);
-                                foreach (RouterInfo r in routerInfos)
-                                {
-                                    if (chosenRouter.name == r._id)
-                                    {
-                                        Debug.Log(r._name);
-                                    }
-                                }
-                                joystick.GetComponent<ETCJoystick>().visible = true;
-                                joystick.GetComponent<ETCJoystick>().activated = true;
+                    CheckPoints.Add(Instantiate(CheckPointPrefeb, CheckPointPreviewer.transform.position, CheckPointPreviewer.transform.rotation) as GameObject);
+                    isPlacingCheckPoint = false;
+                    CheckPoints[CheckPoints.Count - 1].name = checkpointId.ToString();
+                    checkpointId++;
+                    CheckPointPreviewer.SetActive(false);
+                    addRouterButton.SetActive(true);
+                    checkButton.SetActive(true);
+                    restartButton.SetActive(true);
+                    hideHeatButton.SetActive(true);
+                    hideListButton.SetActive(true);
 
-                                //显示圈圈
-                                foreach (Transform child in chosenRouter.transform)
-                                {
-                                    if (child.gameObject.name == "Circle")
-                                    {
-                                        child.gameObject.SetActive(true);
-                                    }
-                                    else
-                                    {
-                                        child.gameObject.GetComponent<MeshRenderer>().material.color = new Vector4(0.4863f, 0.6667f, 0.9529f);
-                                    }
-                                }
-                                addRouterButton.SetActive(false);
-                                checkButton.SetActive(false);
-                                restartButton.SetActive(false);
-                                editButton.SetActive(true);
-                                delButton.SetActive(true);
-                                hideRouterButton.SetActive(true);
-                            }
-                            else if (Physics.Raycast(ray, out hit, maxRayDistance, 1 << 14))//点击到14.标定点，则选定
+                }
+                else//不处于放置状态
+                {
+                    if (chosenRouter != null && chosenCheckpoint == null)//取消router的选定
+                    {
+                        foreach (Transform child in chosenRouter.transform)
+                        {
+                            if (child.gameObject.name == "Circle" || child.gameObject.name == "RouterName" || child.gameObject.name == "NameBoard")
                             {
-                                chosenCheckpoint = hit.transform.gameObject;
-                                chosenRouter = null;
-                                //显示圈圈
-                                foreach (Transform child in chosenCheckpoint.transform)
-                                {
-                                    if (child.gameObject.name == "Circle")
-                                    {
-                                        child.gameObject.SetActive(true);
-                                    }
+                                child.gameObject.SetActive(false);
+                            }
+                            else
+                            {
+                                child.gameObject.GetComponent<MeshRenderer>().material.color = new Vector4(0.2745f, 0.2745f, 0.2745f); ;
+                            }
+                        }
+                        UnchoseRouter();
+                    }
+                    else if (chosenRouter == null && chosenCheckpoint != null)//取消选定checkpoint，
+                    {
 
-                                }
-                                addRouterButton.SetActive(false);
-                                checkButton.SetActive(false);
-                                restartButton.SetActive(false);
-                                DelCheckPointButton.SetActive(true);
-                                SwitchCheckPointButton.SetActive(true);
-                            }
-                        }
-                        else//处于放置状态
+                        foreach (Transform child in chosenCheckpoint.transform)
                         {
-                            Routers.Add(Instantiate(RouterPrefeb, detectPlane.transform.position, detectPlane.transform.rotation) as GameObject);
-                            canPlace = false;
-                            foreach (Transform r in Routers[Routers.Count - 1].GetComponentsInChildren<Transform>())
+                            if (child.gameObject.name == "Circle")
                             {
-                                if (r.gameObject.name == "GameObject")
-                                    r.gameObject.name = routerId.ToString();
+                                child.gameObject.SetActive(false);
                             }
-                            RouterInfo tempRouterInfo = new RouterInfo(routerId.ToString(), routerId.ToString() + "号设备");
-                            routerInfos.Add(tempRouterInfo);
-                            Debug.Log(tempRouterInfo._name);
-                            Heats.Add(
-                                Instantiate(
-                                    heatPrefeb,
-                                    new Vector3(detectPlane.transform.position.x, roomcube.transform.position.y, detectPlane.transform.position.z),
-                                    heatPrefeb.transform.rotation)
-                                    );
-                            Heats[Heats.Count - 1].name = routerId.ToString();
-                            routerId++;
-                            detectPlane.SetActive(false);
                         }
+                        UnchoseCheckPoint();
                     }
-                    else if (chosenRouter != null && chosenCheckpoint == null)//已选定router，点击到的不是已选定，就取消选定
+                    if (Physics.Raycast(ray, out hit, maxRayDistance, 1 << 11))//点击到11.模型，则选定
                     {
-                        if (!(Physics.Raycast(ray, out hit, maxRayDistance, 1 << 11) && hit.transform.gameObject == chosenRouter))
-                        {
-                            foreach (Transform child in chosenRouter.transform)
-                            {
-                                if (child.gameObject.name == "Circle")
-                                {
-                                    child.gameObject.SetActive(false);
-                                }
-                                else
-                                {
-                                    child.gameObject.GetComponent<MeshRenderer>().material.color = new Vector4(0.2745f, 0.2745f, 0.2745f); ;
-                                }
-                            }
-                            UnchoseRouter();
-                        }
+                        chosenRouter = hit.transform.gameObject;
+                        ChoseRouter();
                     }
-                    else if (chosenRouter == null && chosenCheckpoint != null)//已选定checkpoint，点击到的不是已选定，就取消选定
+                    else if (Physics.Raycast(ray, out hit, maxRayDistance, 1 << 14))//点击到14.标定点，则选定
                     {
-                        if (!(Physics.Raycast(ray, out hit, maxRayDistance, 1 << 14) && hit.transform.gameObject == chosenCheckpoint))
-                        {
-                            foreach (Transform child in chosenCheckpoint.transform)
-                            {
-                                if (child.gameObject.name == "Circle")
-                                {
-                                    child.gameObject.SetActive(false);
-                                }
-                            }
-                            UnchoseCheckPoint();
-                        }
+                        chosenCheckpoint = hit.transform.gameObject;
+                        ChoseCheckPoint();
                     }
+
                 }
             }
-            else if (!UItouched && Input.GetTouch(0).phase == TouchPhase.Moved && chosenRouter != null)//移动
+            else if (!UItouched && Input.GetTouch(0).phase == TouchPhase.Moved)//移动
             {
 
                 RaycastHit hit;
                 Ray ray = Camera.main.ScreenPointToRay(Input.GetTouch(0).position);
 
-                if (Physics.Raycast(ray, out hit, maxRayDistance, 1 << 12))
-                {//点击到12.墙体
-                    chosenRouter.transform.parent.gameObject.transform.position = hit.point;
-                    chosenRouter.transform.parent.gameObject.transform.rotation = hit.transform.rotation;
-                    chosenRouter.transform.position = hit.point;
-                    switch (hit.transform.gameObject.tag)
+                if (Physics.Raycast(ray, out hit, maxRayDistance, 1 << 12))//点击到12.墙体
+                {
+                    if (chosenRouter != null)
                     {
-                        case "ground":
-                            chosenRouter.transform.parent.gameObject.transform.Rotate(new Vector3(0, 0, 0));
-                            break;
-                        case "back":
-                            chosenRouter.transform.parent.gameObject.transform.Rotate(new Vector3(-90, 0, -180));
-                            break;
-                        case "forward":
-                            chosenRouter.transform.parent.gameObject.transform.Rotate(new Vector3(-90, -180, -180));
-                            break;
-                        case "left":
-                            chosenRouter.transform.parent.gameObject.transform.Rotate(new Vector3(-90, -90, 0));
-                            break;
-                        case "right":
-                            chosenRouter.transform.parent.gameObject.transform.Rotate(new Vector3(-90, 90, 0));
-                            break;
-                        case "celling":
-                            chosenRouter.transform.parent.gameObject.transform.Rotate(new Vector3(-180, 0, 0));
-                            break;
-
-
-                    }
-                    // foreach (Transform child in chosenRouter.transform)
-                    // {
-                    //     Debug.Log(child.gameObject.name);
-                    //     Debug.Log(child.gameObject.transform.position.ToString("f4"));
-                    // }
-                    // Debug.Log(Heats.Count);
-                    foreach (GameObject heat in Heats)
-                    {
-                        if (heat.name == chosenRouter.name)
+                        chosenRouter.transform.parent.gameObject.transform.position = hit.point;
+                        chosenRouter.transform.parent.gameObject.transform.rotation = hit.transform.rotation;
+                        chosenRouter.transform.position = hit.point;
+                        switch (hit.transform.gameObject.tag)
                         {
-                            // Debug.Log(heat.name);
-                            heat.transform.position = new Vector3(chosenRouter.transform.position.x, heat.transform.position.y, chosenRouter.transform.position.z);
+                            case "ground":
+                                chosenRouter.transform.parent.gameObject.transform.Rotate(new Vector3(0, 0, 0));
+                                break;
+                            case "back":
+                                chosenRouter.transform.parent.gameObject.transform.Rotate(new Vector3(-90, 0, -180));
+                                break;
+                            case "forward":
+                                chosenRouter.transform.parent.gameObject.transform.Rotate(new Vector3(-90, -180, -180));
+                                break;
+                            case "left":
+                                chosenRouter.transform.parent.gameObject.transform.Rotate(new Vector3(-90, -90, 0));
+                                break;
+                            case "right":
+                                chosenRouter.transform.parent.gameObject.transform.Rotate(new Vector3(-90, 90, 0));
+                                break;
+                            case "celling":
+                                chosenRouter.transform.parent.gameObject.transform.Rotate(new Vector3(-180, 0, 0));
+                                break;
                         }
+                        foreach (GameObject heat in Heats)
+                        {
+                            if (heat.name == chosenRouter.name)
+                            {
+                                // Debug.Log(heat.name);
+                                heat.transform.position = new Vector3(chosenRouter.transform.position.x, heat.transform.position.y, chosenRouter.transform.position.z);
+                            }
+                        }
+                    }
+                    else if (chosenCheckpoint != null && hit.transform.gameObject.tag == "ground")
+                    {
+                        chosenCheckpoint.transform.position = hit.point;
                     }
                 }
             }
-            // else if(Input.GetTouch(0).phase == TouchPhase.Ended&&chosenRouter !=null)
-            // {
-            //     // chosenRouter.transform.position = Input.GetTouch(0).position;
-            // }
         }
+    }
+    void ChoseRouter()
+    {
+        chosenCheckpoint = null;
+        Debug.Log(chosenRouter.name);
+        foreach (RouterInfo r in routerInfos)
+        {
+            if (chosenRouter.name == r._id)
+            {
+                Debug.Log(r._name);
+                foreach (Transform child in chosenRouter.transform)
+                {
+                    if (child.gameObject.name == "RouterName" && child.gameObject.GetComponent<TextMesh>().text != r._name)
+                    {
+                        child.gameObject.GetComponent<TextMesh>().text = r._name;
+                        break;
+                    }
+
+                }
+            }
+        }
+        joystick.GetComponent<ETCJoystick>().visible = true;
+        joystick.GetComponent<ETCJoystick>().activated = true;
+
+        //显示圈圈
+        foreach (Transform child in chosenRouter.transform)
+        {
+            if (child.gameObject.name == "Circle" || child.gameObject.name == "RouterName" || child.gameObject.name == "NameBoard")
+            {
+                child.gameObject.SetActive(true);
+            }
+            else
+            {
+                child.gameObject.GetComponent<MeshRenderer>().material.color = new Vector4(0.4863f, 0.6667f, 0.9529f);
+            }
+        }
+        addRouterButton.SetActive(false);
+        checkButton.SetActive(false);
+        restartButton.SetActive(false);
+        DelCheckPointButton.SetActive(false);
+        SwitchCheckPointButton.SetActive(false);
+        editButton.SetActive(true);
+        delButton.SetActive(true);
+        hideRouterButton.SetActive(true);
+    }
+    void ChoseCheckPoint()
+    {
+        chosenRouter = null;
+        //显示圈圈
+        foreach (Transform child in chosenCheckpoint.transform)
+        {
+            if (child.gameObject.name == "Circle")
+            {
+                child.gameObject.SetActive(true);
+            }
+
+        }
+        addRouterButton.SetActive(false);
+        checkButton.SetActive(false);
+        restartButton.SetActive(false);
+        editButton.SetActive(false);
+        delButton.SetActive(false);
+        hideRouterButton.SetActive(false);
+        DelCheckPointButton.SetActive(true);
+        SwitchCheckPointButton.SetActive(true);
     }
     void UnchoseRouter()    //取消选定router
     {
         chosenRouter = null;
         joystick.GetComponent<ETCJoystick>().visible = false;
         joystick.GetComponent<ETCJoystick>().activated = false;
-        // detectPlane.SetActive(true);
+        // RouterPreviewer.SetActive(true);
         //隐藏圈圈
 
         //按钮
@@ -389,6 +453,13 @@ public class Controller : MonoBehaviour
     }
     void UnchoseCheckPoint()
     {
+        foreach (Transform child in chosenCheckpoint.transform)
+        {
+            if (child.gameObject.name == "Page" && child.gameObject.activeSelf)
+            {
+                SwitchCheckPoint();
+            }
+        }
         chosenCheckpoint = null;
         addRouterButton.SetActive(true);
         checkButton.SetActive(true);
@@ -396,47 +467,123 @@ public class Controller : MonoBehaviour
         DelCheckPointButton.SetActive(false);
         SwitchCheckPointButton.SetActive(false);
     }
-
+    GameObject delObj(GameObject o)
+    {
+        if (o != null)
+        {
+            Destroy(o, 0.01f);
+        }
+        return null;
+    }
     //按钮事件
+
+
     public void ReStart()    //重启
     {
         if (isDeleting || isRenaming)
             return;
-        SceneManager.LoadScene(SceneManager.GetActiveScene().name);
-    }
-    public void AddRouter()    //开始放置router
-    {
-        if (isDeleting || isRenaming)
-            return;
-        if (planePlaced && chosenRouter == null)
+        if (RoomSetted)
         {
-            canPlace = true;
-            detectPlane.SetActive(true);
-        }
-    }
-    public void AddCheckPoint()
-    {
-        if (isDeleting || isRenaming)
-            return;
-        if (!planePlaced || canPlace)
-            return;
-        RaycastHit hit;
-        Ray ray = Camera.main.ScreenPointToRay(new Vector3(Screen.width / 2, Screen.height / 2, 0));
-        Debug.Log("hit");
-        if (Physics.Raycast(ray, out hit))
-        {
-            Debug.Log(hit.transform.gameObject.layer);
-
-            if (hit.transform.gameObject.tag == "ground")
+            roomcube = delObj(roomcube);
+            isSearchingRoom = false;
+            isPlacingRouter = false; //处于放置状态
+            isPlacingCheckPoint = false;
+            UItouched = false;
+            RoomSetted = false;   //是否已放置房间
+            isDeleting = false;
+            isRenaming = false;
+            heatAllHiden = false;
+            RouterPreviewer = delObj(RouterPreviewer);
+            chosenCheckpoint = delObj(chosenCheckpoint);
+            roomcube = delObj(roomcube);
+            IdToBeDel = null;//待删除对象id
+            IdTobeRename = null;//待改名对象id
+            for (int i = Heats.Count - 1; i >= 0; i--)
             {
-                CheckPoints.Add(Instantiate(CheckPointPrefeb, hit.point, hit.transform.rotation) as GameObject);
-                CheckPoints[CheckPoints.Count - 1].name = checkpointId.ToString();
-                checkpointId++;
+                Destroy(Heats[i]);
+                Destroy(Routers[i]);
             }
+            Heats = new List<GameObject>();
+            Routers = new List<GameObject>();
+            for (int i = CheckPoints.Count - 1; i >= 0; i--)
+            {
+                Destroy(CheckPoints[i]);
+            }
+            CheckPoints = new List<GameObject>();
+            routerInfos = new List<RouterInfo>();
+            moveUnit = 0.0f;    //移动缩放尺度
+            scaleUnit = 0.1f;
+            routerId = 1;
+            checkpointId = 1;
+
+        }
+        Mask.SetActive(true);
+        isSearchingRoom = true;
+        restartButton.GetComponent<RectTransform>().anchoredPosition3D = new Vector3(45f, 56f, 0f);
+        addRouterButton.SetActive(false);
+        checkButton.SetActive(false);
+        hideHeatButton.SetActive(false);
+        hideListButton.SetActive(false);
+        hideButton.SetActive(false);
+        restartButton.SetActive(false);
+    }
+    public void AddRouter()    //放置router
+    {
+        if (isDeleting || isRenaming)
+            return;
+        if (RoomSetted && chosenRouter == null)
+        {
+            isPlacingRouter = true;
+            if (RouterPreviewer != null)
+                RouterPreviewer.SetActive(true);
+            addRouterButton.SetActive(false);
+            checkButton.SetActive(false);
+            restartButton.SetActive(false);
+            hideHeatButton.SetActive(false);
+            hideListButton.SetActive(false);
         }
 
+    }
+    public void AddCheckPoint()    //放置checkpoint
+    {
+        if (isDeleting || isRenaming)
+            return;
+        if (RoomSetted && chosenCheckpoint == null)
+        {
+            isPlacingCheckPoint = true;
+            if (CheckPointPreviewer != null)
+                CheckPointPreviewer.SetActive(true);
+            addRouterButton.SetActive(false);
+            checkButton.SetActive(false);
+            restartButton.SetActive(false);
+            hideHeatButton.SetActive(false);
+            hideListButton.SetActive(false);
+        }
 
     }
+    // public void AddCheckPoint()
+    // {
+    //     if (isDeleting || isRenaming)
+    //         return;
+    //     if (!RoomSetted || isPlacingRouter)
+    //         return;
+    //     RaycastHit hit;
+    //     Ray ray = Camera.main.ScreenPointToRay(new Vector3(Screen.width / 2, Screen.height / 2, 0));
+    //     Debug.Log("hit");
+    //     if (Physics.Raycast(ray, out hit))
+    //     {
+    //         Debug.Log(hit.transform.gameObject.layer);
+
+    //         if (hit.transform.gameObject.tag == "ground")
+    //         {
+    //             CheckPoints.Add(Instantiate(CheckPointPrefeb, hit.point, hit.transform.rotation) as GameObject);
+    //             CheckPoints[CheckPoints.Count - 1].name = checkpointId.ToString();
+    //             checkpointId++;
+    //         }
+    //     }
+
+
+    // }
     public void DelRouter()
     {
         if (isDeleting || isRenaming || chosenRouter == null)
@@ -496,6 +643,8 @@ public class Controller : MonoBehaviour
         if (isDeleting || isRenaming)
             return;
         bool isPage = false;
+        int showNum = Routers.Count > 6 ? 6 : Routers.Count;
+        int inforIndex = 0;
         if (chosenCheckpoint != null)
         {
             foreach (Transform child in chosenCheckpoint.transform)
@@ -513,6 +662,28 @@ public class Controller : MonoBehaviour
                 else if (child.gameObject.name == "Text")
                 {
                     child.gameObject.SetActive(!child.gameObject.activeSelf);
+                }
+                else if (isPage && inforIndex < showNum && child.gameObject.name == "RouterInfo" + inforIndex)
+                {
+                    foreach (Transform grandchild in child.transform)
+                    {
+                        if (grandchild.gameObject.name == "RouterName" && grandchild.GetComponent<TextMesh>().text != routerInfos[inforIndex]._name)
+                        {
+                            grandchild.GetComponent<TextMesh>().text = routerInfos[inforIndex]._name;
+                        }
+                        else if (grandchild.gameObject.name == "SignalStrength")
+                        {
+                            grandchild.GetComponent<TextMesh>().text = ((float)(Mathf.Round(Vector3.Distance(Heats[inforIndex].transform.position, chosenCheckpoint.transform.position) * 1000)) / 1000).ToString();
+                        }
+                    }
+                    child.gameObject.SetActive(true);
+                    inforIndex++;
+                }
+                else if ((isPage && inforIndex < 6 && inforIndex >= showNum && child.gameObject.name == "RouterInfo" + inforIndex)
+                || (!isPage && inforIndex < 6 && child.gameObject.name == "RouterInfo" + inforIndex))
+                {
+                    child.gameObject.SetActive(false);
+                    inforIndex++;
                 }
 
             }
@@ -552,11 +723,11 @@ public class Controller : MonoBehaviour
     {
         if (isDeleting || isRenaming || chosenRouter == null)
             return;
-        IdToBeDel = chosenRouter.name;
+        IdTobeRename = chosenRouter.name;
         foreach (RouterInfo info in routerInfos)
         {
             Debug.Log(info._id);
-            if (info._id == IdToBeDel)
+            if (info._id == IdTobeRename)
             {
                 InputText.GetComponent<InputField>().text = info._name;
                 break;
@@ -567,21 +738,42 @@ public class Controller : MonoBehaviour
     }
     public void ConfirmRename()
     {
-        if (isRenaming && IdToBeDel != null)
+        if (isRenaming && IdTobeRename != null)
         {
-            Debug.Log(IdToBeDel);
+            string NewName = InputText.GetComponent<InputField>().text;
             foreach (RouterInfo info in routerInfos)
             {
                 Debug.Log(info._id);
-                if (info._id == IdToBeDel)
+                if (info._id == IdTobeRename)
                 {
-                    info._name = InputText.GetComponent<InputField>().text;
+                    info._name = NewName;
                     break;
                 }
             }
-            IdTobeRename = null;
-            isRenaming = false;
-            RenameBox.SetActive(false);
+            foreach (GameObject router in Routers)
+            {
+                foreach (Transform routerBox in router.transform)
+                {
+                    if (routerBox.name == IdTobeRename)
+                    {
+                        foreach (Transform child in routerBox.transform)
+                        {
+                            if (child.gameObject.name == "RouterName" && child.gameObject.GetComponent<TextMesh>().text != NewName)
+                            {
+                                child.gameObject.GetComponent<TextMesh>().text = NewName;
+                                IdTobeRename = null;
+                                isRenaming = false;
+                                RenameBox.SetActive(false);
+                                return;
+                            }
+
+                        }
+                    }
+                }
+
+            }
+
+
 
         }
     }
@@ -619,36 +811,30 @@ public class Controller : MonoBehaviour
     {
         if (isDeleting || isRenaming)
             return;
-        if (roomTransparency == 0.0f)
-            roomTransparency = roomMaterial.color.a;
+        // if (roomTransparency == 0.0f)
+        //     roomTransparency = roomMaterial.color.a;
         roomMaterial.color = new Color(roomMaterial.color.r, roomMaterial.color.g, roomMaterial.color.b, 0);
         hideButton.SetActive(false);
+        restartButton.GetComponent<RectTransform>().anchoredPosition3D = new Vector3(45f, 188f, 0f);
+        hideHeatButton.SetActive(true);
+        hideListButton.SetActive(true);
+        addRouterButton.SetActive(true);
+        checkButton.SetActive(true);
+
     }
-    public void ShowRoom()    //显示房间
-    {
-        if (isDeleting || isRenaming)
-            return;
-        roomMaterial.color = new Color(roomMaterial.color.r, roomMaterial.color.g, roomMaterial.color.b, roomTransparency);
-    }
+    // public void ShowRoom()    //显示房间
+    // {
+    //     if (isDeleting || isRenaming)
+    //         return;
+    //     roomMaterial.color = new Color(roomMaterial.color.r, roomMaterial.color.g, roomMaterial.color.b, roomTransparency);
+    // }
     public void OnMove(Vector2 vector)    //摇杆控制
     {
         if (isDeleting || isRenaming)
             return;
-        // Debug.Log(vector);
-        // Debug.Log(chosenRouter.transform.parent.gameObject.transform.position.ToString("f4"));
-        // Debug.Log(chosenRouter.transform.parent.gameObject.transform.localPosition.ToString("f4"));
         if (chosenRouter != null)
         {
-
             chosenRouter.transform.localPosition = new Vector3(chosenRouter.transform.localPosition.x + vector.x * 0.003f, chosenRouter.transform.localPosition.y, chosenRouter.transform.localPosition.z + vector.y * 0.003f);
-            // foreach (Transform child in chosenRouter.transform.parent.gameObject.transform)
-            // {
-            //     // Debug.Log(child.gameObject.name);
-            //     if (child.gameObject.name == "RouterPrefeb")
-            //     {
-            //         child.gameObject.transform.position = new Vector3(chosenRouter.transform.position.x - 0.005f, chosenRouter.transform.position.y - 0.036f, chosenRouter.transform.position.z + 0.005f);
-            //     }
-            // }
         }
         foreach (GameObject heat in Heats)
         {
